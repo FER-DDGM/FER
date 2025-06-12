@@ -9,15 +9,15 @@ class MultiEmotionDetectionApp:
     def __init__(self, model_path="best.pt"):
         self.emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
         self.colors = [
-            (0, 0, 255),      # red - angry
-            (0, 128, 0),      # green - disgust
-            (128, 0, 128),    # purple - fear
-            (0, 255, 255),    # yellow - happy
-            (255, 0, 0),      # blue - sad
-            (255, 165, 0),    # orange - surprise
-            (128, 128, 128)   # gray - neutral
+            (0, 0, 255),  # red - angry
+            (0, 128, 0),  # green - disgust
+            (128, 0, 128),  # purple - fear
+            (0, 255, 255),  # yellow - happy
+            (255, 0, 0),  # blue - sad
+            (255, 165, 0),  # orange - surprise
+            (128, 128, 128)  # gray - neutral
         ]
-        
+
         # Statistics tracking
         self.detection_stats = {emotion: 0 for emotion in self.emotions}
         self.total_faces_detected = 0
@@ -35,71 +35,76 @@ class MultiEmotionDetectionApp:
         print("Model loaded successfully!")
 
     def detect_emotions(self, frame, confidence_threshold=0.25, show_debug=False):
-        """Detect emotions in frame with enhanced multi-face support"""
-        results = self.model(frame, verbose=False)
+        """Detect emotions using Haar + YOLO with expanded face box"""
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        haar = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = haar.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
         detected_faces = []
         face_count = 0
+        h_img, w_img = frame.shape[:2]
 
-        for result in results:
-            boxes = result.boxes
-            if boxes is not None:
-                for box in boxes:
-                    # Get detection info
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    confidence = float(box.conf[0])
-                    class_id = int(box.cls[0])
+        for (x, y, w, h) in faces:
+            face_count += 1
 
-                    if confidence > confidence_threshold:
-                        face_count += 1
-                        emotion = self.emotions[class_id]
-                        color = self.colors[class_id]
-                        
-                        # Store face detection info
-                        face_info = {
-                            'bbox': (x1, y1, x2, y2),
-                            'emotion': emotion,
-                            'confidence': confidence,
-                            'face_id': face_count
-                        }
-                        detected_faces.append(face_info)
-                        
-                        # Update statistics
-                        self.detection_stats[emotion] += 1
-                        
-                        # Draw enhanced bounding box
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
-                        
-                        # Add face ID number in top-left corner of bounding box
-                        face_id_label = f"#{face_count}"
-                        cv2.putText(frame, face_id_label, (x1, y1 - 35), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                        
-                        # Draw emotion label with confidence
-                        label = f"{emotion}: {confidence:.2f}"
-                        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-                        
-                        # Background for text
-                        cv2.rectangle(frame, (x1, y1 - label_size[1] - 10), 
-                                    (x1 + label_size[0], y1), color, -1)
-                        
-                        # Text
-                        cv2.putText(frame, label, (x1, y1 - 5), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                        
-                        # Add debug info for low confidence detections
-                        if show_debug and confidence < 0.4:
-                            debug_label = f"(Low Conf)"
-                            cv2.putText(frame, debug_label, (x1, y2 + 20), 
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-                        
-                        # Add face area info if debug mode
-                        if show_debug:
-                            face_area = (x2 - x1) * (y2 - y1)
-                            area_label = f"Area: {face_area}"
-                            cv2.putText(frame, area_label, (x1, y2 + 35), 
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            # Expand bounding box by 20%
+            padding = 0.3
+            x_pad = int(w * padding)
+            y_pad = int(h * padding)
 
-        # Update total face count
+            x1 = max(0, x - x_pad)
+            y1 = max(0, y - y_pad)
+            x2 = min(w_img, x + w + x_pad)
+            y2 = min(h_img, y + h + y_pad)
+
+            face_crop = frame[y1:y2, x1:x2]
+            resized_face = cv2.resize(face_crop, (128, 128))
+
+            # Run emotion detection on resized face
+            results = self.model(resized_face, verbose=False)
+            for result in results:
+                boxes = result.boxes
+                if boxes is not None:
+                    for box in boxes:
+                        confidence = float(box.conf[0])
+                        class_id = int(box.cls[0])
+                        if confidence > confidence_threshold:
+                            emotion = self.emotions[class_id]
+                            color = self.colors[class_id]
+
+                            # Update stats
+                            self.detection_stats[emotion] += 1
+
+                            # Store face info
+                            face_info = {
+                                'bbox': (x1, y1, x2, y2),
+                                'emotion': emotion,
+                                'confidence': confidence,
+                                'face_id': face_count
+                            }
+                            detected_faces.append(face_info)
+
+                            # Draw bounding box and label
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
+                            face_id_label = f"#{face_count}"
+                            cv2.putText(frame, face_id_label, (x1, y1 - 35),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                            label = f"{emotion}: {confidence:.2f}"
+                            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+                            cv2.rectangle(frame, (x1, y1 - label_size[1] - 10),
+                                          (x1 + label_size[0], y1), color, -1)
+                            cv2.putText(frame, label, (x1, y1 - 5),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+                            # Optional debug info
+                            if show_debug:
+                                area_label = f"Area: {(x2 - x1) * (y2 - y1)}"
+                                cv2.putText(frame, area_label, (x1, y2 + 15),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                                if confidence < 0.4:
+                                    cv2.putText(frame, "(Low Conf)", (x1, y2 + 30),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
         self.total_faces_detected += face_count
         self.frame_count += 1
 
@@ -111,23 +116,23 @@ class MultiEmotionDetectionApp:
         overlay = frame.copy()
         cv2.rectangle(overlay, (10, 10), (350, 120), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
-        
+
         # Current frame statistics
-        cv2.putText(frame, f"Faces detected: {len(detected_faces)}", 
-                   (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        
+        cv2.putText(frame, f"Faces detected: {len(detected_faces)}",
+                    (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
         # Show detected emotions in current frame
         if detected_faces:
             current_emotions = [face['emotion'] for face in detected_faces]
             emotion_summary = {}
             for emotion in current_emotions:
                 emotion_summary[emotion] = emotion_summary.get(emotion, 0) + 1
-            
+
             y_pos = 55
             for emotion, count in emotion_summary.items():
                 text = f"{emotion}: {count}"
-                cv2.putText(frame, text, (20, y_pos), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.putText(frame, text, (20, y_pos),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                 y_pos += 20
 
     def run_camera(self, show_stats=True, show_debug=False, confidence_threshold=0.25):
@@ -180,10 +185,10 @@ class MultiEmotionDetectionApp:
                 "Controls: 'q'=quit, 's'=save, 'd'=debug, 'r'=reset, '+/-'=threshold",
                 f"Confidence: {confidence_threshold:.2f} | Debug: {'ON' if show_debug else 'OFF'}"
             ]
-            
+
             for i, instruction in enumerate(instructions):
-                cv2.putText(frame, instruction, (10, frame.shape[0] - 40 + i*20), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.putText(frame, instruction, (10, frame.shape[0] - 40 + i * 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
             # Display frame
             cv2.imshow('Multi-Face Emotion Detection', frame)
@@ -230,7 +235,7 @@ class MultiEmotionDetectionApp:
 
         # Detect emotions
         result_frame, detected_faces = self.detect_emotions(frame, confidence_threshold, show_debug)
-        
+
         # Draw statistics overlay
         self.draw_statistics_overlay(result_frame, detected_faces)
 
@@ -240,8 +245,10 @@ class MultiEmotionDetectionApp:
             print(f"  Face {i}: {face['emotion']} (confidence: {face['confidence']:.2f})")
 
         # Save result
-        output_path = f"result_multi_{os.path.basename(image_path)}"
-        cv2.imwrite(output_path, result_frame)
+        output_dir = "results"
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f"result_multi_{os.path.basename(image_path)}")
+        cv2.imwrite(output_path, frame)
         print(f"Result saved: {output_path}")
 
         # Display result
@@ -271,14 +278,16 @@ class MultiEmotionDetectionApp:
 
         print(f"Video properties: {width}x{height}, {fps} FPS, {total_frames} frames")
 
-        # Setup video writer
-        output_path = f"result_multi_{os.path.basename(video_path)}"
+        # Setup video writer in 'results' folder
+        output_dir = "results"
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f"result_multi_{os.path.basename(video_path)}")
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
         frame_count = 0
         total_faces_in_video = 0
-        
+
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -286,10 +295,10 @@ class MultiEmotionDetectionApp:
 
             # Process frame
             result_frame, detected_faces = self.detect_emotions(frame, confidence_threshold, show_debug)
-            
+
             # Add frame statistics
             total_faces_in_video += len(detected_faces)
-            
+
             # Draw statistics overlay
             self.draw_statistics_overlay(result_frame, detected_faces)
 
@@ -301,14 +310,15 @@ class MultiEmotionDetectionApp:
             if frame_count % 100 == 0 or frame_count == total_frames:
                 progress = (frame_count / total_frames) * 100
                 avg_faces_per_frame = total_faces_in_video / frame_count
-                print(f"Progress: {progress:.1f}% ({frame_count}/{total_frames}) - Avg faces/frame: {avg_faces_per_frame:.1f}")
+                print(
+                    f"Progress: {progress:.1f}% ({frame_count}/{total_frames}) - Avg faces/frame: {avg_faces_per_frame:.1f}")
 
         cap.release()
         out.release()
-        
+
         print(f"Video processing complete: {output_path}")
         print(f"Total faces detected in video: {total_faces_in_video}")
-        print(f"Average faces per frame: {total_faces_in_video/frame_count:.2f}")
+        print(f"Average faces per frame: {total_faces_in_video / frame_count:.2f}")
 
     def reset_statistics(self):
         """Reset detection statistics"""
@@ -318,14 +328,14 @@ class MultiEmotionDetectionApp:
 
     def print_session_statistics(self):
         """Print session statistics"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("SESSION STATISTICS")
-        print("="*50)
+        print("=" * 50)
         print(f"Total frames processed: {self.frame_count}")
         print(f"Total faces detected: {self.total_faces_detected}")
         if self.frame_count > 0:
-            print(f"Average faces per frame: {self.total_faces_detected/self.frame_count:.2f}")
-        
+            print(f"Average faces per frame: {self.total_faces_detected / self.frame_count:.2f}")
+
         print("\nEmotion distribution:")
         total_detections = sum(self.detection_stats.values())
         if total_detections > 0:
@@ -358,30 +368,30 @@ def main():
             print("\nCamera Detection Settings:")
             confidence = float(input("Confidence threshold (0.1-0.9, default 0.25): ") or "0.25")
             confidence = max(0.1, min(0.9, confidence))
-            
+
             show_stats = input("Show statistics overlay? (y/n, default y): ").lower() != 'n'
             show_debug = input("Show debug info? (y/n, default n): ").lower() == 'y'
-            
-            app.run_camera(show_stats=show_stats, show_debug=show_debug, 
-                          confidence_threshold=confidence)
+
+            app.run_camera(show_stats=show_stats, show_debug=show_debug,
+                           confidence_threshold=confidence)
 
         elif choice == '2':
             image_path = input("Enter image path: ").strip()
             confidence = float(input("Confidence threshold (0.1-0.9, default 0.25): ") or "0.25")
             confidence = max(0.1, min(0.9, confidence))
             show_debug = input("Show debug info? (y/n, default n): ").lower() == 'y'
-            
-            app.process_image(image_path, confidence_threshold=confidence, 
-                            show_debug=show_debug)
+
+            app.process_image(image_path, confidence_threshold=confidence,
+                              show_debug=show_debug)
 
         elif choice == '3':
             video_path = input("Enter video path: ").strip()
             confidence = float(input("Confidence threshold (0.1-0.9, default 0.25): ") or "0.25")
             confidence = max(0.1, min(0.9, confidence))
             show_debug = input("Show debug info? (y/n, default n): ").lower() == 'y'
-            
-            app.process_video(video_path, confidence_threshold=confidence, 
-                            show_debug=show_debug)
+
+            app.process_video(video_path, confidence_threshold=confidence,
+                              show_debug=show_debug)
 
         elif choice == '4':
             app.print_session_statistics()
