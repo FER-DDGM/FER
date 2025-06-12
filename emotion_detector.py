@@ -41,25 +41,31 @@ class EmotionDetectionApp:
                     confidence = float(box.conf[0])
                     class_id = int(box.cls[0])
 
-                    if confidence > 0.5:  # confidence threshold
-                        # get emotion and color
+                    if confidence > 0.25:  # Reduced threshold
+                        # Get emotion and color
                         emotion = self.emotions[class_id]
                         color = self.colors[class_id]
-
-                        # draw bounding box
+                        
+                        # Draw bounding box
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-                        # draw emotion label
+                        
+                        # Draw emotion label with confidence
                         label = f"{emotion}: {confidence:.2f}"
                         label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-
-                        # background for text
-                        cv2.rectangle(frame, (x1, y1 - label_size[1] - 10),
-                                      (x1 + label_size[0], y1), color, -1)
-
-                        # text
-                        cv2.putText(frame, label, (x1, y1 - 5),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                        
+                        # Background for text
+                        cv2.rectangle(frame, (x1, y1 - label_size[1] - 10), 
+                                    (x1 + label_size[0], y1), color, -1)
+                        
+                        # Text
+                        cv2.putText(frame, label, (x1, y1 - 5), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                        
+                        # Add debug info for low confidence detections
+                        if confidence < 0.4:
+                            debug_label = f"(Low Conf)"
+                            cv2.putText(frame, debug_label, (x1, y2 + 15), 
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
         return frame
 
