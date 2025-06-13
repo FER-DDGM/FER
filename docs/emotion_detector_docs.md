@@ -132,6 +132,20 @@ Launches a live webcam interface:
 - Supports keyboard input for toggling modes
 - Displays real-time annotations
 
+#### Keyboard Controls:
+
+- `q`: Quit
+- `s`: Save screenshot
+- `d`: Toggle debug info (e.g., detection method, emotion history)
+- `f`: Toggle face preprocessing (OpenCV+YOLO vs. YOLO-only)
+- `t`: Toggle stats overlay (faces detected, FPS, etc.)
+- `r`: Reset all tracking and statistics
+- `p`: Print detailed statistics
+- `+` / `=`: Increase confidence threshold
+- `-`: Decrease confidence threshold
+- `z`: Decrease minimum face size ratio
+- `x`: Increase minimum face size ratio
+
 ---
 
 ### `reset_all_data()`
@@ -163,6 +177,7 @@ Processes one image:
 
 - Detects and annotates emotions
 - Saves and shows the result
+- Returns list of detected face results
 
 ---
 
@@ -198,7 +213,40 @@ detector.run_camera()
 
 ---
 
+## Options and Settings
+
+### Camera Mode
+
+Run using `run_camera()` to use webcam in real time.
+
+**Configurable features:**
+
+- Toggle between detection modes (OpenCV+YOLO or YOLO-only).
+- Show/hide debugging overlays.
+- Change confidence threshold (0.1 to 0.9).
+- Adjust minimum face size (relative to frame size).
+- Reset all session data.
+- View detailed statistics at any time.
+
+### Image Mode
+
+Use `process_single_image(image_path)` to analyze a still image.
+
+- Saves annotated image.
+- Outputs results to console.
+
+### Video Mode
+
+Use `process_video_file(video_path)` to process a full video.
+
+- Annotates each frame.
+- Saves a new video file with visual results.
+- Reports progress and estimated time remaining.
+
+---
+
 ## Notes
 
 - Use OpenCV face detection for better results on frontal faces.
 - Adjust `confidence_threshold` and `min_face_size_ratio` depending on camera setup.
+- Profile or rotated faces may not be well recognized with OpenCV cascades.
