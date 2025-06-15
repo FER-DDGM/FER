@@ -11,7 +11,7 @@ from ultralytics import YOLO
 import kagglehub
 
 
-class ImprovedEmotionTrainer:
+class EmotionTrainer:
     def __init__(self):
         """
         Initialize the trainer with emotion labels, dataset parameters,
@@ -506,7 +506,7 @@ def main():
     print("Improved YOLO Emotion Detection Training (FER+ Dataset)")
     print("=" * 60)
 
-    trainer = ImprovedEmotionTrainer()
+    trainer = EmotionTrainer()
 
     # Check dataset availability
     print("Checking FER+ dataset...")

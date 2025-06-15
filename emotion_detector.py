@@ -7,7 +7,7 @@ import cv2
 from ultralytics import YOLO
 
 
-class ImprovedEmotionDetector:
+class EmotionDetector:
     def __init__(self, model_path="best.pt"):
         self.emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
         self.colors = [
@@ -895,7 +895,7 @@ def main():
 
     # Initialize detector
     model_path = input("Model path (default: best.pt): ").strip() or "best.pt"
-    detector = ImprovedEmotionDetector(model_path)
+    detector = EmotionDetector(model_path)
 
     while True:
         print("\nChoose detection mode:")
